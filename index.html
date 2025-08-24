@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moon Phase Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .moon-container {
+            filter: drop-shadow(0 0 15px rgba(255, 255, 220, 0.5));
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-yellow-100">Moon Phase Tracker</h1>
+            <p class="text-lg text-gray-400 mt-2">Discover the lunar cycle from your screen.</p>
+        </header>
+
+        <!-- Today's Moon Phase -->
+        <section id="today-section" class="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 md:p-8 mb-8 border border-gray-700">
+            <h2 class="text-2xl font-semibold text-center mb-6">Today's Moon Phase</h2>
+            <div class="flex flex-col md:flex-row items-center justify-center gap-8">
+                <div id="today-moon-container" class="moon-container w-32 h-32 md:w-48 md:h-48">
+                    <!-- Moon SVG will be injected here -->
+                </div>
+                <div class="text-center md:text-left">
+                    <p id="today-date" class="text-xl md:text-2xl font-medium text-gray-300"></p>
+                    <p id="today-phase-name" class="text-2xl md:text-3xl font-bold text-yellow-200 mt-2"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Action Button -->
+        <div class="text-center mb-8">
+            <button id="forecast-btn" class="bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold py-3 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-yellow-300/50">
+                Show Next 7 Days
+            </button>
+        </div>
+
+        <!-- 7-Day Forecast Section -->
+        <section id="forecast-section" class="hidden">
+            <h2 class="text-2xl font-semibold text-center mb-6">7-Day Forecast</h2>
+            <div id="forecast-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                <!-- Forecast items will be injected here -->
+            </div>
+        </section>
+        
+        <footer class="text-center mt-12 text-gray-500 text-sm">
+            <p>Moon phase calculations are approximate.</p>
+        </footer>
+
+    </div>
+
+    <script>
+        // --- Core Moon Phase Calculation Logic ---
+
+        /**
+         * Calculates the moon phase for a given date.
+         * @param {Date} date - The date to calculate the phase for.
+         * @returns {object} An object containing the phase value (0-1) and name.
+         */
+        function getMoonPhase(date = new Date()) {
+            const LUNAR_CYCLE = 29.530588853;
+            // Known new moon: January 6, 2000, 18:14 UTC
+            const KNOWN_NEW_MOON = new Date(Date.UTC(2000, 0, 6, 18, 14));
+
+            const phase = getJulianDate(date) - getJulianDate(KNOWN_NEW_MOON);
+            const age = phase % LUNAR_CYCLE;
+            const normalizedAge = age / LUNAR_CYCLE;
+
+            const phaseNames = [
+                "New Moon", "Waxing Crescent", "First Quarter", "Waxing Gibbous",
+                "Full Moon", "Waning Gibbous", "Last Quarter", "Waning Crescent"
+            ];
+            
+            // Determine phase name based on normalized age
+            let phaseIndex = Math.floor(normalizedAge * 8 + 0.5) & 7;
+
+            return {
+                phase: normalizedAge,
+                name: phaseNames[phaseIndex],
+            };
+        }
+
+        /**
+         * Converts a Date object to a Julian Date.
+         * @param {Date} date - The date to convert.
+         * @returns {number} The Julian Date.
+         */
+        function getJulianDate(date) {
+            return (date.getTime() / 86400000) - (date.getTimezoneOffset() / 1440) + 2440587.5;
+        }
+
+
+        // --- SVG Moon Generation ---
+
+        /**
+         * Creates an SVG element representing the moon phase.
+         * @param {number} phase - The moon phase value (0-1, where 0 is new moon).
+         * @returns {string} An SVG string.
+         */
+        function createMoonSVG(phase) {
+            const svgSize = 100;
+            const center = svgSize / 2;
+            const radius = svgSize / 2 - 2; // a little padding
+
+            // Calculate the position of the shadow terminator
+            const x = center + radius * 2 * (phase - 0.5);
+            const rx = Math.abs(radius * 2 * (phase - 0.5));
+            
+            let shadowPath;
+            // FIX: Corrected template literals for calculations within the SVG path string.
+            if (phase <= 0.5) {
+                // Waxing phases
+                shadowPath = `
+                    <path d="M ${center},${center - radius} 
+                             A ${rx},${radius} 0 1,1 ${center},${center + radius}
+                             A ${radius},${radius} 0 1,0 ${center},${center - radius} Z" 
+                          fill="black" fill-opacity="0.8" />
+                `;
+            } else {
+                // Waning phases
+                shadowPath = `
+                    <path d="M ${center},${center - radius} 
+                             A ${rx},${radius} 0 1,0 ${center},${center + radius}
+                             A ${radius},${radius} 0 1,1 ${center},${center - radius} Z" 
+                          fill="black" fill-opacity="0.8" />
+                `;
+            }
+
+            return `
+                <svg viewBox="0 0 ${svgSize} ${svgSize}" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <radialGradient id="moonGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                            <stop offset="70%" style="stop-color:rgb(240,240,220)" />
+                            <stop offset="100%" style="stop-color:rgb(200,200,180)" />
+                        </radialGradient>
+                    </defs>
+                    <circle cx="${center}" cy="${center}" r="${radius}" fill="url(#moonGradient)" />
+                    ${shadowPath}
+                </svg>
+            `;
+        }
+
+
+        // --- DOM Manipulation and Event Handling ---
+
+        const todayMoonContainer = document.getElementById('today-moon-container');
+        const todayDateEl = document.getElementById('today-date');
+        const todayPhaseNameEl = document.getElementById('today-phase-name');
+        const forecastBtn = document.getElementById('forecast-btn');
+        const forecastSection = document.getElementById('forecast-section');
+        const forecastGrid = document.getElementById('forecast-grid');
+
+        /**
+         * Displays the moon phase for a given date in a specified container.
+         * @param {Date} date - The date to display.
+         * @param {HTMLElement} container - The container for the SVG.
+         * @param {HTMLElement} dateEl - The element for the date string.
+         * @param {HTMLElement} nameEl - The element for the phase name.
+         */
+        function displayMoonPhase(date, container, dateEl, nameEl) {
+            const { phase, name } = getMoonPhase(date);
+            container.innerHTML = createMoonSVG(phase);
+            if (dateEl) {
+                dateEl.textContent = date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            }
+            if (nameEl) {
+                nameEl.textContent = name;
+            }
+        }
+
+        /**
+         * Generates and displays the 7-day forecast.
+         */
+        function showForecast() {
+            forecastGrid.innerHTML = ''; // Clear previous forecast
+            for (let i = 1; i <= 7; i++) {
+                const futureDate = new Date();
+                futureDate.setDate(futureDate.getDate() + i);
+                
+                const { phase, name } = getMoonPhase(futureDate);
+
+                const card = document.createElement('div');
+                card.className = 'bg-gray-800/60 p-4 rounded-xl text-center border border-gray-700 flex flex-col items-center';
+                
+                const dateString = futureDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
+                card.innerHTML = `
+                    <div class="w-20 h-20 mb-3 moon-container">${createMoonSVG(phase)}</div>
+                    <p class="font-semibold text-yellow-200">${name}</p>
+                    <p class="text-sm text-gray-400 mt-1">${dateString}</p>
+                `;
+                forecastGrid.appendChild(card);
+            }
+            forecastSection.classList.remove('hidden');
+            forecastBtn.textContent = 'Hide Forecast';
+        }
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            displayMoonPhase(today, todayMoonContainer, todayDateEl, todayPhaseNameEl);
+
+            forecastBtn.addEventListener('click', () => {
+                const isHidden = forecastSection.classList.contains('hidden');
+                if (isHidden) {
+                    showForecast();
+                } else {
+                    forecastSection.classList.add('hidden');
+                    forecastBtn.textContent = 'Show Next 7 Days';
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
